@@ -1,0 +1,130 @@
+name: 'Dev Docker Build (Fork-friendly)'
+
+# Workflow simplificado para construir imágenes Docker en forks personales
+# - Solo construye para AMD64 (más rápido)
+# - Usa runners estándar de GitHub (ubuntu-latest)
+# - Sube solo a GitHub Container Registry (GHCR)
+
+env:
+  NODE_OPTIONS: '--max-old-space-size=7168'
+  NODE_VERSION: '22.21.0'
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag_name:
+        description: 'Tag name for the image (e.g., dev, my-feature, v1.0.0)'
+        required: false
+        default: 'dev'
+        type: string
+      push_to_registry:
+        description: 'Push image to GHCR (GitHub Container Registry)'
+        required: false
+        type: boolean
+        default: true
+
+jobs:
+  build-docker:
+    name: Build Docker Image (AMD64 only)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Install pnpm
+        run: npm install -g pnpm@9.15.0
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build n8n
+        run: pnpm build
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to GitHub Container Registry
+        if: inputs.push_to_registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Determine image tags
+        id: tags
+        run: |
+          REPO_OWNER=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
+          TAG_NAME="${{ inputs.tag_name }}"
+          BRANCH_NAME="${{ github.ref_name }}"
+
+          # Sanitizar el nombre de la rama para usarlo como tag
+          SAFE_BRANCH_NAME=$(echo "$BRANCH_NAME" | tr '/' '-' | tr -cd '[:alnum:]-_')
+
+          # Construir el tag completo
+          if [[ "$TAG_NAME" == "dev" ]]; then
+            FULL_TAG="ghcr.io/${REPO_OWNER}/n8n:${SAFE_BRANCH_NAME}"
+          else
+            FULL_TAG="ghcr.io/${REPO_OWNER}/n8n:${TAG_NAME}"
+          fi
+
+          echo "image_tag=${FULL_TAG}" >> $GITHUB_OUTPUT
+          echo "Building image with tag: ${FULL_TAG}"
+
+      - name: Build and push n8n Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./docker/images/n8n/Dockerfile
+          build-args: |
+            NODE_VERSION=${{ env.NODE_VERSION }}
+            N8N_VERSION=${{ inputs.tag_name }}
+            N8N_RELEASE_TYPE=dev
+          platforms: linux/amd64
+          push: ${{ inputs.push_to_registry }}
+          tags: ${{ steps.tags.outputs.image_tag }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build summary
+        if: always()
+        run: |
+          echo "## Build Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Image Tag**: \`${{ steps.tags.outputs.image_tag }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Platform**: linux/amd64" >> $GITHUB_STEP_SUMMARY
+          echo "- **Pushed to Registry**: ${{ inputs.push_to_registry }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          if [[ "${{ inputs.push_to_registry }}" == "true" ]]; then
+            echo "### Pull the image:" >> $GITHUB_STEP_SUMMARY
+            echo "\`\`\`bash" >> $GITHUB_STEP_SUMMARY
+            echo "docker pull ${{ steps.tags.outputs.image_tag }}" >> $GITHUB_STEP_SUMMARY
+            echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "### Run the container:" >> $GITHUB_STEP_SUMMARY
+            echo "\`\`\`bash" >> $GITHUB_STEP_SUMMARY
+            echo "docker run -it --rm -p 5678:5678 ${{ steps.tags.outputs.image_tag }}" >> $GITHUB_STEP_SUMMARY
+            echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: Output image information
+        if: inputs.push_to_registry
+        run: |
+          echo "✅ Image successfully built and pushed!"
+          echo ""
+          echo "Image: ${{ steps.tags.outputs.image_tag }}"
+          echo ""
+          echo "To pull the image:"
+          echo "  docker pull ${{ steps.tags.outputs.image_tag }}"
+          echo ""
+          echo "To run the container:"
+          echo "  docker run -it --rm -p 5678:5678 ${{ steps.tags.outputs.image_tag }}"
