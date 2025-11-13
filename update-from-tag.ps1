@@ -84,15 +84,15 @@ if ($LASTEXITCODE -eq 0) {
     Write-Host ""
 }
 
-# Hacer rebase
-Write-Host "Iniciando rebase desde $Tag..." -ForegroundColor Cyan
+# Hacer merge
+Write-Host "Iniciando merge desde $Tag..." -ForegroundColor Cyan
 Write-Host "   Esto puede tomar un momento..." -ForegroundColor Gray
 Write-Host ""
 
-$rebaseOutput = git rebase $Tag 2>&1
-$rebaseSuccess = $LASTEXITCODE -eq 0
+$mergeOutput = git merge $Tag -m "chore: Merge tag '$Tag'" 2>&1
+$mergeSuccess = $LASTEXITCODE -eq 0
 
-if ($rebaseSuccess) {
+if ($mergeSuccess) {
     Write-Host "========================================" -ForegroundColor Green
     Write-Host "Actualizacion exitosa!" -ForegroundColor Green
     Write-Host "========================================" -ForegroundColor Green
@@ -132,10 +132,10 @@ if ($rebaseSuccess) {
     Write-Host "Para resolver los conflictos:" -ForegroundColor Cyan
     Write-Host "   1. Edita los archivos con conflictos" -ForegroundColor White
     Write-Host "   2. git add <archivo-resuelto>" -ForegroundColor White
-    Write-Host "   3. git rebase --continue" -ForegroundColor White
+    Write-Host "   3. git commit" -ForegroundColor White
     Write-Host ""
     Write-Host "Para abortar y volver al estado anterior:" -ForegroundColor Cyan
-    Write-Host "   git rebase --abort" -ForegroundColor White
+    Write-Host "   git merge --abort" -ForegroundColor White
     Write-Host "   git checkout $backupBranch" -ForegroundColor White
     Write-Host "   git branch -D dev-license" -ForegroundColor White
     Write-Host "   git checkout -b dev-license" -ForegroundColor White

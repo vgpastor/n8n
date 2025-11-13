@@ -87,12 +87,12 @@ else
     echo ""
 fi
 
-# Hacer rebase desde el tag
-echo -e "${CYAN}📝 Iniciando rebase desde $TAG...${NC}"
+# Hacer merge desde el tag
+echo -e "${CYAN}📝 Iniciando merge desde $TAG...${NC}"
 echo -e "${GRAY}   Esto puede tomar un momento...${NC}"
 echo ""
 
-if git rebase "$TAG" 2>&1; then
+if git merge "$TAG" -m "chore: Merge tag '$TAG'" 2>&1; then
     echo ""
     echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
     echo -e "${GREEN}✅ ¡Actualización exitosa!${NC}"
@@ -134,10 +134,10 @@ else
     echo -e "${CYAN}📖 Para resolver los conflictos:${NC}"
     echo "   1. Edita los archivos con conflictos"
     echo "   2. git add <archivo-resuelto>"
-    echo "   3. git rebase --continue"
+    echo "   3. git commit"
     echo ""
     echo -e "${CYAN}🔙 Para abortar y volver al estado anterior:${NC}"
-    echo "   git rebase --abort"
+    echo "   git merge --abort"
     echo "   git checkout $BACKUP_BRANCH"
     echo "   git branch -D dev-license"
     echo "   git checkout -b dev-license"

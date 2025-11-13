@@ -223,11 +223,28 @@ chmod +x update-from-tag.sh
 4. **Si hay conflictos**, el script te indicará:
    - Edita los archivos con conflictos
    - `git add <archivo-resuelto>`
-   - `git rebase --continue`
+   - `git commit`
 
 5. **El script crea un backup automático** por seguridad:
-   - Si algo sale mal: `git rebase --abort`
+   - Si algo sale mal: `git merge --abort`
    - Volver al backup: `git checkout dev-license-backup-TIMESTAMP`
+
+### Ventajas de Usar Merge
+
+Los scripts usan **merge** en lugar de rebase para mantener un historial limpio:
+
+- ✅ **Historial limpio**: Solo verás tus commits + un commit de merge por actualización
+- ✅ **Sin ruido**: No se traen los cientos de commits individuales de n8n
+- ✅ **Clara trazabilidad**: Cada merge commit indica claramente "actualizado desde n8n@X.X.X"
+- ✅ **Más simple**: Conflictos más fáciles de resolver (todo de una vez)
+
+**Historial resultante:**
+```
+[tu-commit] - fix(dev-license): Tus cambios
+[merge]     - chore: Merge tag 'n8n@1.121.0'  ← Solo un commit
+[tu-commit] - feat(dev-license): Tu funcionalidad
+[merge]     - chore: Merge tag 'n8n@1.120.0'
+```
 
 ### Archivos que Pueden Tener Conflictos
 
@@ -238,7 +255,7 @@ Al actualizar, estos archivos pueden tener conflictos frecuentes:
 - ⚠️ `packages/@n8n/backend-common/src/license-state.ts`
 - ⚠️ `packages/@n8n/config/src/configs/license.config.ts`
 
-**Cómo resolver:** Los scripts de actualización usan `rebase`, lo que mantiene tus cambios encima de los nuevos cambios oficiales. Si hay conflictos, Git te mostrará dónde y deberás combinar manualmente ambas versiones.
+**Cómo resolver:** Los scripts de actualización usan `merge`, lo que combina los cambios oficiales con tus cambios. Si hay conflictos, Git te mostrará dónde y deberás combinar manualmente ambas versiones.
 
 ## 🆘 Troubleshooting
 
