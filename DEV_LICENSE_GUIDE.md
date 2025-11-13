@@ -167,6 +167,79 @@ N8N_LICENSE_DEV_MODE=true pnpm dev
 # Sin mensajes de advertencia sobre licencias
 ```
 
+## 🔄 Actualización a Nuevas Versiones de n8n
+
+### Scripts de Actualización
+
+Se incluyen scripts para actualizar fácilmente la rama `dev-license` desde cualquier tag oficial de n8n.
+
+#### Windows (PowerShell)
+
+```powershell
+# Ver tags disponibles
+.\update-from-tag.ps1
+
+# Actualizar a una versión específica
+.\update-from-tag.ps1 -Tag n8n@1.120.0
+
+# Actualizar a la última versión
+$latestTag = git tag -l "n8n@*" | Select-Object -Last 1
+.\update-from-tag.ps1 -Tag $latestTag
+```
+
+#### Linux/macOS (Bash)
+
+```bash
+# Dar permisos de ejecución (solo la primera vez)
+chmod +x update-from-tag.sh
+
+# Ver tags disponibles
+./update-from-tag.sh
+
+# Actualizar a una versión específica
+./update-from-tag.sh n8n@1.120.0
+
+# Actualizar a la última versión
+./update-from-tag.sh $(git tag -l 'n8n@*' | tail -1)
+```
+
+### Proceso de Actualización
+
+1. **Asegúrate de estar en la rama dev-license**:
+   ```bash
+   git checkout dev-license
+   ```
+
+2. **Commitea cualquier cambio pendiente**:
+   ```bash
+   git add .
+   git commit -m "tu mensaje"
+   ```
+
+3. **Ejecuta el script de actualización**:
+   - Windows: `.\update-from-tag.ps1 -Tag n8n@1.121.0`
+   - Linux/macOS: `./update-from-tag.sh n8n@1.121.0`
+
+4. **Si hay conflictos**, el script te indicará:
+   - Edita los archivos con conflictos
+   - `git add <archivo-resuelto>`
+   - `git rebase --continue`
+
+5. **El script crea un backup automático** por seguridad:
+   - Si algo sale mal: `git rebase --abort`
+   - Volver al backup: `git checkout dev-license-backup-TIMESTAMP`
+
+### Archivos que Pueden Tener Conflictos
+
+Al actualizar, estos archivos pueden tener conflictos frecuentes:
+
+- ⚠️ `packages/cli/src/license.ts`
+- ⚠️ `packages/cli/src/license/license.service.ts`
+- ⚠️ `packages/@n8n/backend-common/src/license-state.ts`
+- ⚠️ `packages/@n8n/config/src/configs/license.config.ts`
+
+**Cómo resolver:** Los scripts de actualización usan `rebase`, lo que mantiene tus cambios encima de los nuevos cambios oficiales. Si hay conflictos, Git te mostrará dónde y deberás combinar manualmente ambas versiones.
+
 ## 🆘 Troubleshooting
 
 **Problema**: El modo dev no se activa
