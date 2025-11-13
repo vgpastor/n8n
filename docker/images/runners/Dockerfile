@@ -107,8 +107,13 @@ ENV NODE_ENV=production \
     N8N_RELEASE_TYPE=${N8N_RELEASE_TYPE} \
     SHELL=/bin/sh
 
-# Bring `uv` over from python-runner-builder
+# Bring `uv` over from python-runner-builder, to make the image easier to extend
 COPY --from=python-runner-builder /usr/local/bin/uv /usr/local/bin/uv
+
+# Bring corepack and pnpm over, to make the image easier to extend 
+COPY --from=node-alpine /usr/local/lib/node_modules/corepack /usr/local/lib/node_modules/corepack
+COPY --from=node-alpine /usr/local/bin/corepack /usr/local/bin/corepack
+RUN corepack enable pnpm
 
 # Bring node over from node-alpine
 COPY --from=node-alpine /usr/local/bin/node /usr/local/bin/node
