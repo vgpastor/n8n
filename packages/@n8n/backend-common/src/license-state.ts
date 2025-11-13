@@ -23,6 +23,16 @@ export class LicenseState {
 		if (!this.licenseProvider) throw new ProviderNotSetError();
 	}
 
+	/**
+	 * Check if dev mode is enabled in the license provider
+	 * Dev mode bypasses all license checks
+	 */
+	private isDevModeEnabled(): boolean {
+		if (!this.licenseProvider) return false;
+		// Check if the provider has devModeEnabled property (from License class)
+		return (this.licenseProvider as any).devModeEnabled === true;
+	}
+
 	// --------------------
 	//     core queries
 	// --------------------
@@ -32,6 +42,9 @@ export class LicenseState {
 	 */
 	isLicensed(feature: BooleanLicenseFeature | BooleanLicenseFeature[]) {
 		this.assertProvider();
+
+		// If dev mode is enabled, all features are licensed
+		if (this.isDevModeEnabled()) return true;
 
 		if (typeof feature === 'string') return this.licenseProvider.isLicensed(feature);
 
@@ -46,6 +59,20 @@ export class LicenseState {
 
 	getValue<T extends keyof FeatureReturnType>(feature: T): FeatureReturnType[T] {
 		this.assertProvider();
+
+		// If dev mode is enabled, return unlimited values for quotas
+		if (this.isDevModeEnabled()) {
+			const featureStr = String(feature);
+			if (featureStr.startsWith('quota:')) {
+				// For quota features, return unlimited (-1) or max value
+				if (featureStr.includes('maxHistoryDays') || featureStr.includes('retention')) {
+					return UNLIMITED_LICENSE_QUOTA as FeatureReturnType[T];
+				}
+				return UNLIMITED_LICENSE_QUOTA as FeatureReturnType[T];
+			}
+			// For boolean features, return true
+			return true as FeatureReturnType[T];
+		}
 
 		return this.licenseProvider.getValue(feature);
 	}

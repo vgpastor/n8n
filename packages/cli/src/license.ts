@@ -35,6 +35,8 @@ export class License implements LicenseProvider {
 
 	private isShuttingDown = false;
 
+	private devModeEnabled = false;
+
 	constructor(
 		private readonly logger: Logger,
 		private readonly instanceSettings: InstanceSettings,
@@ -43,6 +45,70 @@ export class License implements LicenseProvider {
 		private readonly globalConfig: GlobalConfig,
 	) {
 		this.logger = this.logger.scoped('license');
+	}
+
+	enableDevMode() {
+		this.devModeEnabled = true;
+		this.logger.info('🔓 Development mode enabled - All enterprise features unlocked');
+	}
+
+	/**
+	 * Creates a mock LicenseManager that simulates a valid enterprise license
+	 * This allows the SDK to think we have a real license, avoiding warnings
+	 */
+	private createMockLicenseManager(): LicenseManager {
+		const now = new Date();
+		const validFrom = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000); // 30 days ago
+		const validTo = new Date(now.getTime() + 365 * 24 * 60 * 60 * 1000); // 1 year from now
+
+		// Create a mock entitlement for enterprise plan
+		const mockEntitlement: TEntitlement = {
+			id: 'dev-mode-enterprise-entitlement',
+			productId: 'dev-mode-enterprise-product',
+			productMetadata: {
+				terms: {
+					isMainPlan: true,
+				},
+			},
+			features: Object.values(LICENSE_FEATURES).reduce((acc, feature) => {
+				acc[feature] = true;
+				return acc;
+			}, {} as Record<string, boolean>),
+			featureOverrides: Object.values(LICENSE_QUOTAS).reduce((acc, quota) => {
+				acc[quota] = UNLIMITED_LICENSE_QUOTA;
+				return acc;
+			}, {} as Record<string, number>),
+			validFrom,
+			validTo,
+			isFloatable: true, // Allow dev mode to work across multiple instances
+		};
+
+		// Create mock methods that simulate a valid LicenseManager
+		const mockManager = {
+			hasFeatureEnabled: () => true,
+			getFeatureValue: (feature: string) => {
+				const featureStr = String(feature);
+				if (featureStr === 'planName') return 'Enterprise (Dev Mode)';
+				if (featureStr.indexOf('LIMIT') !== -1 || featureStr.indexOf('QUOTA') !== -1) {
+					return UNLIMITED_LICENSE_QUOTA;
+				}
+				return true;
+			},
+			getCurrentEntitlements: () => [mockEntitlement],
+			getManagementJwt: () => 'dev-mode-jwt-token',
+			getConsumerId: () => 'dev-mode-consumer',
+			activate: async () => {},
+			renew: async () => {},
+			reload: async () => {},
+			clear: async () => {},
+			shutdown: async () => {},
+			initialize: async () => {},
+			toString: () => 'Mock License Manager (Dev Mode) - Enterprise License Active',
+			enableAutoRenewals: () => {},
+			disableAutoRenewals: () => {},
+		} as unknown as LicenseManager;
+
+		return mockManager;
 	}
 
 	async init({
@@ -55,6 +121,18 @@ export class License implements LicenseProvider {
 		}
 		if (this.isShuttingDown) {
 			this.logger.warn('License manager already shutting down');
+			return;
+		}
+
+		// Check if dev mode is enabled via environment variable
+		if (this.globalConfig.license.devMode) {
+			this.enableDevMode();
+		}
+
+		// If dev mode is enabled, create a mock license manager instead of a real one
+		if (this.devModeEnabled) {
+			this.manager = this.createMockLicenseManager();
+			this.logger.info('✅ Mock license manager initialized - Simulating valid enterprise license');
 			return;
 		}
 
@@ -217,6 +295,7 @@ export class License implements LicenseProvider {
 	}
 
 	isLicensed(feature: BooleanLicenseFeature) {
+		if (this.devModeEnabled) return true;
 		return this.manager?.hasFeatureEnabled(feature) ?? false;
 	}
 
@@ -345,6 +424,14 @@ export class License implements LicenseProvider {
 	}
 
 	getValue<T extends keyof FeatureReturnType>(feature: T): FeatureReturnType[T] {
+		if (this.devModeEnabled) {
+			// Return unlimited values for quotas in dev mode
+			const featureStr = String(feature);
+			if (featureStr.indexOf('LIMIT') !== -1 || featureStr.indexOf('QUOTA') !== -1) {
+				return UNLIMITED_LICENSE_QUOTA as FeatureReturnType[T];
+			}
+			return true as FeatureReturnType[T];
+		}
 		return this.manager?.getFeatureValue(feature) as FeatureReturnType[T];
 	}
 
@@ -412,6 +499,7 @@ export class License implements LicenseProvider {
 	}
 
 	getPlanName(): string {
+		if (this.devModeEnabled) return 'Enterprise (Dev Mode)';
 		return this.getValue('planName') ?? 'Community';
 	}
 

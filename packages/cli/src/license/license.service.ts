@@ -110,6 +110,16 @@ export class LicenseService {
 	}
 
 	async activateLicense(activationKey: string, eulaUri?: string) {
+		// Check for magic development key
+		const DEV_MAGIC_KEY = 'DEV-MAGIC-KEY-ENTERPRISE';
+		if (activationKey === DEV_MAGIC_KEY) {
+			this.logger.info('🔓 Magic development key detected - Enabling dev mode');
+			this.license.enableDevMode();
+			// Reinitialize the license manager with the mock
+			await this.license.init({ forceRecreate: true });
+			return;
+		}
+
 		try {
 			await this.license.activate(activationKey, eulaUri);
 		} catch (e) {
